@@ -7,9 +7,14 @@ import {
   CheckCheck,
   ChevronRight,
   CircleHelp,
+  CircleAlert,
+  ClipboardList,
+  Clock3,
   Database,
   MessageCircle,
   PackageCheck,
+  Phone,
+  Search,
   Send,
   Server,
   ShieldCheck,
@@ -38,9 +43,9 @@ const steps = [
   {
     label: 'Nhân viên cập nhật',
     title: 'Nhân viên báo tiến độ ngay trong Zalo',
-    text: 'Một nút bấm để nhận việc, báo đang làm hoặc báo đã xong.',
-    manager: 'Nam đã nhận việc lúc 14:10. Đang soạn hàng.',
-    bot: 'Khi hoàn tất, Nam bấm “Xong”. Sếp sẽ thấy cập nhật ngay.',
+    text: 'Nhân viên nhắn trực tiếp cho bot: mã đơn, tiến độ hoặc vướng mắc. Bot ghi nhận và hỏi lại nếu thiếu thông tin.',
+    manager: 'Đơn #042 em đã nhận, đang soạn. Còn thiếu 1 hộp, anh kiểm tra giúp em.',
+    bot: 'Đã ghi nhận phản hồi của Nam vào đơn #042: đang soạn, thiếu 1 hộp. Đã đánh dấu cần sếp xử lý.',
     status: 'Nam đang soạn hàng',
   },
   {
@@ -49,7 +54,49 @@ const steps = [
     text: 'Sếp xem việc nào xong, việc nào trễ và ai đang phụ trách.',
     manager: 'Nam đã hoàn tất. Đơn của chị Lan sẵn sàng giao.',
     bot: 'Đã cập nhật trạng thái và lưu lại lịch sử xử lý.',
-    status: 'Đã hoàn tất',
+    status: 'Đã soạn xong · chờ giao',
+  },
+];
+
+const crmViews = [
+  {
+    id: 'customers',
+    label: 'Khách hàng',
+    icon: Users,
+    title: 'Biết khách nào cần chăm',
+    text: 'Mỗi khách có các trao đổi gửi qua bot, đơn gần nhất và người đang phụ trách.',
+    stats: [['Đang chăm', '18'], ['Cần gọi lại', '4']],
+    rows: [
+      { avatar: 'L', name: 'Chị Lan', detail: 'Mua lần gần nhất hôm nay', value: 'Đang xử lý', tone: 'blue' },
+      { avatar: 'T', name: 'Anh Thành', detail: 'Đã mua 3 lần · 2 ngày trước', value: 'Cần gọi lại', tone: 'amber' },
+      { avatar: 'M', name: 'Cửa hàng Minh', detail: 'Khách mới · vừa để lại tin', value: 'Mới', tone: 'green' },
+    ],
+  },
+  {
+    id: 'orders',
+    label: 'Đơn hàng',
+    icon: Boxes,
+    title: 'Một chỗ để xem đơn',
+    text: 'Đơn từ tin nhắn được gắn với khách, số lượng, người xử lý và hạn giao.',
+    stats: [['Đơn hôm nay', '12'], ['Cần giao', '5']],
+    rows: [
+      { avatar: '#042', name: 'Đơn #042 · Chị Lan', detail: '4 hộp mầm xanh · giao 15:00', value: 'Đang soạn', tone: 'blue' },
+      { avatar: '#039', name: 'Đơn #039 · Anh Thành', detail: '2 thùng hàng · giao 16:30', value: 'Chờ giao', tone: 'amber' },
+      { avatar: '#036', name: 'Đơn #036 · Cửa hàng Minh', detail: '1 kiện · đã thu tiền', value: 'Hoàn tất', tone: 'green' },
+    ],
+  },
+  {
+    id: 'progress',
+    label: 'Tiến độ',
+    icon: ClipboardList,
+    title: 'Biết ai đang giữ việc',
+    text: 'Mỗi bước có người phụ trách và thời gian cập nhật, để việc trễ hiện ra sớm.',
+    stats: [['Đã xong', '7'], ['Đang làm', '3']],
+    rows: [
+      { avatar: 'N', name: 'Nam Nguyễn', detail: 'Soạn đơn #042 · cập nhật 14:10', value: 'Đang làm', tone: 'blue' },
+      { avatar: 'H', name: 'Hà Trần', detail: 'Gọi xác nhận 3 khách · cập nhật 14:05', value: 'Đang làm', tone: 'amber' },
+      { avatar: 'M', name: 'Minh Lê', detail: 'Đơn #036 · cập nhật 13:42', value: 'Đã xong', tone: 'green' },
+    ],
   },
 ];
 
@@ -63,6 +110,7 @@ function ChatBubble({ children, side = 'left', tone = '' }) {
 
 function App() {
   const [step, setStep] = useState(0);
+  const [crmView, setCrmView] = useState('customers');
   const [employees, setEmployees] = useState(8);
   const [minutes, setMinutes] = useState(15);
   const [hourlyValue, setHourlyValue] = useState(30000);
@@ -77,6 +125,8 @@ function App() {
   const monthlyCost = Number(serverCost) + Number(oaCost);
   const estimatedDifference = timeValue - monthlyCost;
   const progress = [25, 48, 73, 100][step];
+  const activeCrm = crmViews.find((view) => view.id === crmView) || crmViews[0];
+  const ActiveCrmIcon = activeCrm.icon;
 
   const nextStep = () => setStep((current) => (current + 1) % steps.length);
 
@@ -145,7 +195,7 @@ function App() {
             <div className="section-heading">
               <div className="eyebrow">TỪ TIN NHẮN ĐẾN KẾT QUẢ</div>
               <h2>Quy trình rõ ràng,<br className="desktop-break" /> sếp không phải đuổi theo.</h2>
-              <p>Chạm từng bước để xem ai làm gì. Mọi cập nhật đều nằm trong một luồng dễ theo dõi.</p>
+              <p>Chạm từng bước để xem ai làm gì. Mọi cập nhật đều nằm trong một luồng dễ theo dõi. Đây là luồng đề xuất, cần thử kết nối Zalo OA và KiotViet trước khi triển khai thật.</p>
             </div>
             <div className="flow-grid">
               <div className="step-list" role="tablist" aria-label="Các bước điều phối">
@@ -163,7 +213,7 @@ function App() {
                 <h3>{steps[step].title}</h3>
                 <p>{steps[step].text}</p>
                 <div className="demo-chat">
-                  <div className="demo-message manager-message"><span className="mini-avatar manager-avatar">S</span><div><small>SẾP</small><p>{steps[step].manager}</p></div></div>
+                  <div className="demo-message manager-message"><span className="mini-avatar manager-avatar">S</span><div><small>{step === 2 ? 'NHÂN VIÊN NAM' : 'SẾP / THÔNG BÁO'}</small><p>{steps[step].manager}</p></div></div>
                   <div className="demo-message bot-message"><span className="mini-avatar bot-avatar">D</span><div><small>BOT ĐIỀU PHỐI</small><p>{steps[step].bot}</p></div></div>
                 </div>
                 <div className="demo-bottom"><span className="status-chip"><span className="status-dot" />{steps[step].status}</span><button className="next-button" type="button" onClick={nextStep}>Bước tiếp theo <ArrowRight size={15} /></button></div>
@@ -180,11 +230,11 @@ function App() {
             <a href="#hosting" className="text-link">Xem phần chạy ở đâu <ArrowRight size={16} /></a>
           </div>
           <div className="dashboard-mock">
-            <div className="dashboard-head"><div><span className="dash-overline">TỔNG QUAN CÔNG VIỆC</span><h3>Hôm nay, 25 tháng 11</h3></div><button type="button" className="date-button">Ca chiều <ChevronRight size={14} /></button></div>
+            <div className="dashboard-head"><div><span className="dash-overline">TỔNG QUAN CÔNG VIỆC</span><h3>Hôm nay, 25 tháng 11</h3></div><span className="date-button">Ca chiều</span></div>
             <div className="dashboard-stats">
               <div className="dash-stat"><small>Tổng việc</small><strong>12</strong><span>Đã giao hôm nay</span></div>
               <div className="dash-stat done-stat"><small>Hoàn tất</small><strong>{step === 3 ? '9' : '7'}</strong><span>Đã báo qua bot</span></div>
-              <div className="dash-stat doing-stat"><small>Đang làm</small><strong>{step > 1 ? '2' : '3'}</strong><span>Nhân viên đã nhận</span></div>
+              <div className="dash-stat doing-stat"><small>Đang làm</small><strong>{step === 3 ? '2' : '3'}</strong><span>Nhân viên đã nhận</span></div>
             </div>
             <div className="chart-area">
               <div className="chart-title"><b>Tiến độ trong ngày</b><span>{step === 3 ? '75%' : '58%'} hoàn tất</span></div>
@@ -200,12 +250,37 @@ function App() {
           </div>
         </section>
 
+        <section className="section-band crm-band" id="crm">
+          <div className="section-wrap crm-section">
+            <div className="section-heading crm-heading">
+              <div className="eyebrow">KHÁCH HÀNG + ĐƠN HÀNG + TIẾN ĐỘ</div>
+              <h2>Từ khách hỏi đến đơn giao,<br className="desktop-break" /> cùng một luồng.</h2>
+              <p>Bot lưu khách và đơn theo đúng việc sếp cần theo dõi. Nhân viên cập nhật trong Zalo, sếp xem ở bảng này.</p>
+              <div className="crm-pipeline" aria-label="Các bước quản lý khách và đơn"><span className="pipeline-done">Khách hỏi</span><ArrowRight size={14} /><span className="pipeline-done">Tạo đơn</span><ArrowRight size={14} /><span className="pipeline-current">Đang xử lý</span><ArrowRight size={14} /><span>Hoàn tất</span></div>
+            </div>
+            <div className="crm-mock" aria-live="polite">
+              <div className="crm-topbar"><div className="crm-title"><span className="crm-app-icon"><ActiveCrmIcon size={17} /></span><div><b>Điều phối gọn</b><small>Quản lý nội bộ · dữ liệu mẫu</small></div></div><span className="estimate-label">Mô phỏng tương tác</span></div>
+              <div className="crm-tabs" role="tablist" aria-label="Góc nhìn CRM">
+                {crmViews.map((view) => {
+                  const Icon = view.icon;
+                  return <button key={view.id} type="button" role="tab" aria-selected={crmView === view.id} className={crmView === view.id ? 'active' : ''} onClick={() => setCrmView(view.id)}><Icon size={15} />{view.label}</button>;
+                })}
+              </div>
+              <div className="crm-summary"><div><small>ĐANG XEM</small><h3>{activeCrm.title}</h3><p>{activeCrm.text}</p></div><span className="crm-updated"><Clock3 size={13} /> cập nhật vừa xong</span></div>
+              <div className="crm-stats">{activeCrm.stats.map(([label, value]) => <div key={label}><small>{label}</small><b>{value}</b></div>)}<div className="crm-stat-blue"><small>{crmView === 'customers' ? 'Tổng khách' : 'Tổng đơn / việc'}</small><b>{crmView === 'customers' ? '22' : '12'}</b></div></div>
+              <div className="crm-list-head"><span>{activeCrm.id === 'customers' ? 'Khách hàng' : activeCrm.id === 'orders' ? 'Đơn hàng' : 'Người phụ trách'}</span><span>Trạng thái</span></div>
+              <div className="crm-list">{activeCrm.rows.map((row) => <div className="crm-row" key={row.name}><span className={`crm-avatar ${row.tone}`}>{row.avatar}</span><span className="crm-row-main"><b>{row.name}</b><small>{row.detail}</small></span><span className={`crm-status ${row.tone}`}>{row.value}</span><ChevronRight size={15} className="crm-row-arrow" /></div>)}</div>
+              <div className="crm-foot"><CheckCheck size={15} /> Nhân viên nhắn hoặc chọn trạng thái; bot ghi nhận đúng bước của đơn. Các tab dùng dữ liệu minh họa.</div>
+            </div>
+          </div>
+        </section>
+
         <section className="section-band host-band" id="hosting">
           <div className="section-wrap hosting-section">
             <div className="hosting-copy">
               <div className="eyebrow">CÂU SẾP HAY HỎI</div>
               <h2>“Nó chạy ở máy anh hay sao?”</h2>
-              <p className="hosting-answer">Bot chạy trên một máy chủ luôn bật trên internet. Máy cá nhân tắt vẫn hoạt động; sếp và nhân viên chỉ cần dùng Zalo.</p>
+              <p className="hosting-answer">Có thể chạy bot trên máy sẵn có của chủ hoặc thuê máy chủ riêng. Chạy tại nhà thì máy phải bật, không ngủ và có mạng; máy tắt thì bot tạm ngừng. Thuê máy chủ thì không phụ thuộc máy cá nhân.</p>
               <div className="hosting-visual" aria-label="Luồng dữ liệu từ Zalo tới máy chủ rồi KiotViet hoặc bảng theo dõi">
                 <div className="host-node"><span className="host-icon zalo-icon"><MessageCircle size={19} /></span><b>Zalo</b><small>Sếp & nhân viên</small></div>
                 <ArrowRight className="host-arrow" size={18} />
@@ -216,11 +291,11 @@ function App() {
               <p className="tiny-note">* Cách nối với KiotViet cần kiểm tra API hoặc quy trình xuất/nhập dữ liệu đang dùng.</p>
               <div className="hosting-costs" aria-label="Các khoản hosting tham khảo">
                 <div><span>Trang trình bày trên GitHub Pages</span><b>0đ / tháng</b></div>
-                <div><span>Máy chủ nhỏ để bot chạy liên tục</span><b>khoảng 100-300k / tháng</b></div>
+                <div><span>Dùng máy có sẵn của chủ</span><b>0đ tiền thuê máy; có điện và sao lưu</b></div><div><span>Ví dụ tiền điện: máy 50W chạy 24/7</span><b>36 kWh / tháng × giá điện thực tế</b></div><div><span>API AI để hiểu tin nhắn tự nhiên</span><b>tính theo mức dùng; đặt hạn mức riêng</b></div>
                 <div><span>Tên miền riêng nếu cần</span><b>khoảng 250-500k / năm</b></div>
                 <div><span>Zalo OA / API</span><b>tùy gói và chính sách hiện hành</b></div>
               </div>
-              <p className="tiny-note">GitHub Pages chỉ chứa trang giới thiệu; bot thật cần máy chủ và nơi lưu việc riêng.</p>
+              <p className="tiny-note">Giá trị trong bộ tính là giả định ngân sách. Chưa tính API AI, công phát triển và tích hợp; phí OA phải xác nhận theo gói và loại tin. GitHub Pages chỉ phục vụ trang trình bày công khai, dữ liệu khách hàng thật cần đăng nhập và máy chủ riêng.</p>
             </div>
             <div className="cost-panel">
               <div className="cost-panel-head"><span className="eyebrow">ƯỚC TÍNH ĐỂ DỄ HÌNH DUNG</span><span className="estimate-label"><CircleHelp size={13} /> Không phải báo giá</span></div>
